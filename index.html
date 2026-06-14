@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Coin Toss Predictor v3+ (Style Model)</title>
+
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#000000">
+</head>
+
+<body style="font-family:Arial;text-align:center;padding:30px">
+
+<h2>⚽ Coin Toss Predictor v3+ (Hybrid AI Model)</h2>
+
+<select id="teamA"></select>
+VS
+<select id="teamB"></select>
+
+<br><br>
+
+<button onclick="predict()" style="padding:10px 20px">
+Predict
+</button>
+
+<p id="out"></p>
+
+<script>
+
+////////////////////////////////////////////////////
+// 1. 球队能力模型
+////////////////////////////////////////////////////
+const db = {
+  "Brazil": { base:0.6, captain:0.7, style:0.85, possession:0.8 },
+  "France": { base:0.5, captain:0.68, style:0.8, possession:0.78 },
+  "Argentina": { base:0.55, captain:0.72, style:0.82, possession:0.75 },
+  "England": { base:0.5, captain:0.65, style:0.78, possession:0.7 },
+  "Germany": { base:0.45, captain:0.6, style:0.75, possession:0.8 },
+
+  "Spain": { base:0.4, captain:0.62, style:0.9, possession:0.88 },
+  "Netherlands": { base:0.45, captain:0.66, style:0.82, possession:0.78 },
+  "Portugal": { base:0.5, captain:0.7, style:0.8, possession:0.75 },
+  "Belgium": { base:0.48, captain:0.65, style:0.78, possession:0.7 },
+
+  "USA": { base:0.4, captain:0.6, style:0.75, possession:0.72 },
+  "Mexico": { base:0.38, captain:0.62, style:0.7, possession:0.65 },
+
+  "Japan": { base:0.42, captain:0.68, style:0.76, possession:0.78 },
+  "Korea": { base:0.43, captain:0.65, style:0.74, possession:0.75 },
+
+  "Senegal": { base:0.35, captain:0.6, style:0.7, possession:0.65 },
+  "Morocco": { base:0.36, captain:0.62, style:0.72, possession:0.7 },
+
+  "Tunisia": { base:0.3, captain:0.55, style:0.6, possession:0.55 },
+  "Ecuador": { base:0.32, captain:0.58, style:0.62, possession:0.6 },
+  "Saudi Arabia": { base:0.28, captain:0.5, style:0.55, possession:0.5 },
+  "Canada": { base:0.33, captain:0.55, style:0.65, possession:0.6 },
+  "Australia": { base:0.34, captain:0.57, style:0.6, possession:0.58 }
+};
+
+////////////////////////////////////////////////////
+// 2. coin toss基础倾向（经验模型）
+////////////////////////////////////////////////////
+const tossBias = {
+  "Brazil":0.52,"France":0.50,"Argentina":0.53,"England":0.49,"Germany":0.51,
+  "Spain":0.48,"Netherlands":0.54,"Portugal":0.52,"Belgium":0.50,
+  "USA":0.56,"Mexico":0.58,
+  "Japan":0.57,"Korea":0.56,
+  "Senegal":0.60,"Morocco":0.59,
+  "Tunisia":0.62,"Ecuador":0.60,
+  "Saudi Arabia":0.63,"Canada":0.60,"Australia":0.59
+};
+
+////////////////////////////////////////////////////
+// 3. 战术风格模型（新增）
+////////////////////////////////////////////////////
+const styleMap = {
+  "Brazil":"attacking",
+  "France":"balanced",
+  "Argentina":"attacking",
+  "England":"balanced",
+  "Germany":"possession",
+
+  "Spain":"possession",
+  "Netherlands":"possession",
+  "Portugal":"balanced",
+  "Belgium":"balanced",
+
+  "USA":"pressing",
+  "Mexico":"counter",
+
+  "Japan":"possession",
+  "Korea":"pressing",
+
+  "Senegal":"counter",
+  "Morocco":"defensive",
+
+  "Tunisia":"defensive",
+  "Ecuador":"counter",
+  "Saudi Arabia":"defensive",
+  "Canada":"pressing",
+  "Australia":"counter"
+};
+
+////////////////////////////////////////////////////
+// 4. 初始化下拉
+////////////////////////////////////////////////////
+let selectA=document.getElementById("teamA");
+let selectB=document.getElementById("teamB");
+
+for(let t in db){
+  let a=document.createElement("option");
+  let b=document.createElement("option");
+  a.value=b.value=t;
+  a.innerText=b.innerText=t;
+  selectA.appendChild(a);
+  selectB.appendChild(b);
+}
+
+////////////////////////////////////////////////////
+// 5. 实力模型
+////////////////////////////////////////////////////
+function calcScore(team){
+  let t=db[team];
+
+  return (
+    t.base*0.4 +
+    t.captain*0.25 +
+    t.style*0.2 +
+    t.possession*0.15
+  );
+}
+
+////////////////////////////////////////////////////
+// 6. 风格修正（新增核心）
+////////////////////////////////////////////////////
+function styleBias(team){
+
+  let s=styleMap[team]||"balanced";
+
+  if(s==="attacking") return 0.03;
+  if(s==="pressing") return 0.04;
+  if(s==="counter") return 0.02;
+  if(s==="possession") return -0.03;
+  if(s==="defensive") return 0.05;
+
+  return 0;
+}
+
+////////////////////////////////////////////////////
+// 7. coin toss模型（已融合风格）
+////////////////////////////////////////////////////
+function calcTossReal(team){
+
+  let base=tossBias[team]||0.5;
+  let t=db[team];
+
+  return (
+    base*0.6 +
+    t.captain*0.2 +
+    t.style*0.15 +
+    (1-t.possession)*0.05 +
+    styleBias(team)
+  );
+}
+
+////////////////////////////////////////////////////
+// 8. softmax（稳定概率）
+////////////////////////////////////////////////////
+function softmax(a,b){
+
+  let ea=Math.exp(a);
+  let eb=Math.exp(b);
+  let sum=ea+eb;
+
+  return {
+    A:ea/sum,
+    B:eb/sum
+  };
+}
+
+////////////////////////////////////////////////////
+// 9. 主预测函数（融合模型）
+////////////////////////////////////////////////////
+function predict(){
+
+  let A=document.getElementById("teamA").value;
+  let B=document.getElementById("teamB").value;
+
+  let scoreA=calcScore(A);
+  let scoreB=calcScore(B);
+
+  let realA=calcTossReal(A);
+  let realB=calcTossReal(B);
+
+  // 双模型融合
+  scoreA=scoreA*0.65 + realA*0.35;
+  scoreB=scoreB*0.65 + realB*0.35;
+
+  // 稳定扰动
+  scoreA+=(Math.random()-0.5)*0.02;
+  scoreB+=(Math.random()-0.5)*0.02;
+
+  let p=softmax(scoreA,scoreB);
+
+  let result=p.A>p.B
+    ? A+" 更可能选开球"
+    : B+" 更可能选开球";
+
+  document.getElementById("out").innerHTML=
+    "📊 "+A+": "+(p.A*100).toFixed(1)+"%<br>"+
+    "📊 "+B+": "+(p.B*100).toFixed(1)+"%<br><br>"+
+    "⚽ "+result;
+}
+
+////////////////////////////////////////////////////
+// 10. PWA注册
+////////////////////////////////////////////////////
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js');
+}
+
+</script>
+
+</body>
+</html>
