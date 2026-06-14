@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Coin Toss App</title>
+
+  <!-- PWA核心 -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#000000">
+</head>
+
+<body style="font-family:Arial;text-align:center;padding:40px">
+
+<h2>⚽ Coin Toss App</h2>
+
+<select id="teamA">
+  <option>Sweden</option>
+  <option>Tunisia</option>
+  <option>Netherlands</option>
+  <option>Japan</option>
+</select>
+
+VS
+
+<select id="teamB">
+  <option>Sweden</option>
+  <option>Tunisia</option>
+  <option>Netherlands</option>
+  <option>Japan</option>
+</select>
+
+<br><br>
+
+<button onclick="predict()" style="padding:10px 20px">
+Predict
+</button>
+
+<p id="out"></p>
+
+<script>
+
+const db = {
+  "Sweden": 0.2,
+  "Tunisia": -0.1,
+  "Netherlands": 0.3,
+  "Japan": -0.2
+};
+
+function predict(){
+
+  let A = document.getElementById("teamA").value;
+  let B = document.getElementById("teamB").value;
+
+  let scoreA = db[A] + (Math.random()-0.5)*0.3;
+  let scoreB = db[B] + (Math.random()-0.5)*0.3;
+
+  let result = scoreA > scoreB
+    ? A + " 更可能选开球"
+    : B + " 更可能选开球";
+
+  document.getElementById("out").innerHTML =
+    scoreA.toFixed(2) + " vs " + scoreB.toFixed(2) +
+    "<br><br><b>" + result + "</b>";
+}
+
+// 注册PWA
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js');
+}
+
+</script>
+
+</body>
+</html>
