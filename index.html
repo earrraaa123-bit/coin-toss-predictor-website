@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Coin Toss Predictor v4 (48 Teams)</title>
+
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#000000">
+</head>
+
+<body style="font-family:Arial;text-align:center;padding:30px">
+
+<h2>⚽ Coin Toss Predictor v4 (48 Teams AI Model)</h2>
+
+<select id="teamA"></select>
+VS
+<select id="teamB"></select>
+
+<br><br>
+
+<button onclick="predict()" style="padding:10px 20px">
+Predict
+</button>
+
+<p id="out"></p>
+
+<script>
+
+////////////////////////////////////////////////////
+// 1. 48队能力模型
+////////////////////////////////////////////////////
+const db = {
+  Germany:{base:0.55,captain:0.7,style:0.85,possession:0.82},
+  France:{base:0.58,captain:0.72,style:0.83,possession:0.8},
+  England:{base:0.57,captain:0.7,style:0.8,possession:0.78},
+  Spain:{base:0.56,captain:0.7,style:0.9,possession:0.88},
+  Portugal:{base:0.55,captain:0.72,style:0.82,possession:0.8},
+  Italy:{base:0.52,captain:0.68,style:0.78,possession:0.76},
+  Netherlands:{base:0.54,captain:0.7,style:0.84,possession:0.8},
+  Belgium:{base:0.53,captain:0.68,style:0.8,possession:0.75},
+  Croatia:{base:0.5,captain:0.75,style:0.78,possession:0.78},
+  Switzerland:{base:0.5,captain:0.65,style:0.75,possession:0.72},
+  Austria:{base:0.48,captain:0.62,style:0.74,possession:0.7},
+  Denmark:{base:0.5,captain:0.68,style:0.76,possession:0.74},
+  Norway:{base:0.48,captain:0.65,style:0.74,possession:0.7},
+  Sweden:{base:0.49,captain:0.66,style:0.75,possession:0.72},
+  Poland:{base:0.5,captain:0.7,style:0.73,possession:0.7},
+  Serbia:{base:0.5,captain:0.68,style:0.76,possession:0.72},
+
+  Brazil:{base:0.62,captain:0.78,style:0.9,possession:0.88},
+  Argentina:{base:0.6,captain:0.78,style:0.86,possession:0.84},
+  Uruguay:{base:0.55,captain:0.74,style:0.8,possession:0.78},
+  Colombia:{base:0.52,captain:0.7,style:0.78,possession:0.76},
+  Ecuador:{base:0.48,captain:0.66,style:0.72,possession:0.7},
+  Paraguay:{base:0.47,captain:0.65,style:0.7,possession:0.68},
+  Peru:{base:0.46,captain:0.64,style:0.7,possession:0.68},
+
+  Morocco:{base:0.52,captain:0.7,style:0.78,possession:0.74},
+  Senegal:{base:0.53,captain:0.72,style:0.78,possession:0.75},
+  Tunisia:{base:0.48,captain:0.66,style:0.7,possession:0.68},
+  Algeria:{base:0.5,captain:0.68,style:0.75,possession:0.72},
+  Egypt:{base:0.5,captain:0.7,style:0.76,possession:0.72},
+  Cameroon:{base:0.5,captain:0.68,style:0.74,possession:0.7},
+  Ghana:{base:0.48,captain:0.66,style:0.72,possession:0.68},
+  Nigeria:{base:0.5,captain:0.68,style:0.76,possession:0.72},
+  "Côte d'Ivoire":{base:0.49,captain:0.67,style:0.74,possession:0.7},
+
+  Japan:{base:0.54,captain:0.7,style:0.82,possession:0.84},
+  "South Korea":{base:0.53,captain:0.7,style:0.8,possession:0.82},
+  Iran:{base:0.5,captain:0.68,style:0.74,possession:0.7},
+  "Saudi Arabia":{base:0.5,captain:0.66,style:0.7,possession:0.68},
+  Qatar:{base:0.47,captain:0.64,style:0.68,possession:0.66},
+  Australia:{base:0.5,captain:0.66,style:0.74,possession:0.72},
+  Iraq:{base:0.46,captain:0.62,style:0.68,possession:0.64},
+  "United Arab Emirates":{base:0.46,captain:0.62,style:0.68,possession:0.64},
+
+  "United States":{base:0.52,captain:0.7,style:0.78,possession:0.76},
+  Canada:{base:0.5,captain:0.66,style:0.74,possession:0.72},
+  Mexico:{base:0.52,captain:0.72,style:0.78,possession:0.74},
+  "Costa Rica":{base:0.46,captain:0.64,style:0.7,possession:0.66},
+  Panama:{base:0.45,captain:0.62,style:0.68,possession:0.64},
+  Jamaica:{base:0.45,captain:0.62,style:0.68,possession:0.64},
+
+  "New Zealand":{base:0.44,captain:0.6,style:0.65,possession:0.6},
+  Iceland:{base:0.47,captain:0.65,style:0.7,possession:0.66}
+};
+
+////////////////////////////////////////////////////
+// 2. 开球倾向
+////////////////////////////////////////////////////
+const tossBias = {
+  Germany:0.51,France:0.50,England:0.49,Spain:0.48,Portugal:0.52,
+  Italy:0.50,Netherlands:0.54,Belgium:0.50,Croatia:0.53,Switzerland:0.50,
+  Austria:0.49,Denmark:0.50,Norway:0.52,Sweden:0.50,Poland:0.51,Serbia:0.52,
+
+  Brazil:0.53,Argentina:0.52,Uruguay:0.54,Colombia:0.55,Ecuador:0.58,Paraguay:0.57,Peru:0.56,
+
+  Morocco:0.60,Senegal:0.61,Tunisia:0.62,Algeria:0.60,Egypt:0.59,Cameroon:0.60,Ghana:0.61,
+  Nigeria:0.60,"Côte d'Ivoire":0.59,
+
+  Japan:0.56,"South Korea":0.55,Iran:0.57,"Saudi Arabia":0.60,Qatar:0.58,Australia:0.56,
+  Iraq:0.59,"United Arab Emirates":0.58,
+
+  "United States":0.55,Canada:0.56,Mexico:0.58,
+  "Costa Rica":0.60,Panama:0.59,Jamaica:0.60,
+
+  "New Zealand":0.58,Iceland:0.52
+};
+
+////////////////////////////////////////////////////
+// 3. 风格模型
+////////////////////////////////////////////////////
+const styleMap = {
+  Germany:"possession",France:"balanced",England:"balanced",Spain:"possession",
+  Portugal:"balanced",Italy:"defensive",Netherlands:"possession",Belgium:"balanced",
+
+  Croatia:"balanced",Switzerland:"defensive",Austria:"counter",Denmark:"balanced",
+  Norway:"counter",Sweden:"balanced",Poland:"counter",Serbia:"counter",
+
+  Brazil:"attacking",Argentina:"attacking",Uruguay:"counter",Colombia:"attacking",
+  Ecuador:"counter",Paraguay:"defensive",Peru:"counter",
+
+  Morocco:"defensive",Senegal:"physical",Tunisia:"defensive",Algeria:"attacking",
+  Egypt:"attacking",Cameroon:"physical",Ghana:"physical",Nigeria:"attacking",
+  "Côte d'Ivoire":"balanced",
+
+  Japan:"possession","South Korea":"pressing",Iran:"defensive",
+  "Saudi Arabia":"defensive",Qatar:"possession",Australia:"counter",
+  Iraq:"defensive","United Arab Emirates":"balanced",
+
+  "United States":"pressing",Canada:"pressing",Mexico:"attacking",
+  "Costa Rica":"defensive",Panama:"counter",Jamaica:"physical",
+
+  "New Zealand":"defensive",Iceland:"balanced"
+};
+
+////////////////////////////////////////////////////
+// 4. 初始化
+////////////////////////////////////////////////////
+let selectA=document.getElementById("teamA");
+let selectB=document.getElementById("teamB");
+
+for(let t in db){
+  let a=document.createElement("option");
+  let b=document.createElement("option");
+  a.value=b.value=t;
+  a.innerText=b.innerText=t;
+  selectA.appendChild(a);
+  selectB.appendChild(b);
+}
+
+////////////////////////////////////////////////////
+// 5. 模型函数
+////////////////////////////////////////////////////
+function calcScore(t){
+  let x=db[t];
+  return x.base*0.4 + x.captain*0.25 + x.style*0.2 + x.possession*0.15;
+}
+
+function styleBias(t){
+  let s=styleMap[t]||"balanced";
+  if(s==="attacking") return 0.03;
+  if(s==="pressing") return 0.04;
+  if(s==="counter") return 0.02;
+  if(s==="possession") return -0.03;
+  if(s==="defensive") return 0.05;
+  return 0;
+}
+
+function calcToss(t){
+  let base=tossBias[t]||0.5;
+  let x=db[t];
+  return base*0.6 + x.captain*0.2 + (1-x.possession)*0.05 + styleBias(t);
+}
+
+function softmax(a,b){
+  let ea=Math.exp(a);
+  let eb=Math.exp(b);
+  let s=ea+eb;
+  return {A:ea/s,B:eb/s};
+}
+
+////////////////////////////////////////////////////
+// 6. 预测
+////////////////////////////////////////////////////
+function predict(){
+  let A=selectA.value;
+  let B=selectB.value;
+
+  let a=calcScore(A)+calcToss(A);
+  let b=calcScore(B)+calcToss(B);
+
+  let p=softmax(a,b);
+
+  document.getElementById("out").innerHTML=
+    A+": "+(p.A*100).toFixed(1)+"%<br>"+
+    B+": "+(p.B*100).toFixed(1)+"%<br><br>"+
+    "⚽ "+(p.A>p.B?A:B)+" 更可能选开球";
+}
+
+</script>
+
+</body>
+</html>
