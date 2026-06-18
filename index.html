@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>World Cup Kickoff Predictor</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --card: #141b34;
+      --soft: #1d2748;
+      --text: #f5f7ff;
+      --muted: #aeb8d8;
+      --accent: #7dd3fc;
+      --good: #86efac;
+      --warn: #fde68a;
+      --bad: #fca5a5;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top, #1c2750 0%, var(--bg) 55%);
+      color: var(--text);
+      padding: 18px;
+    }
+
+    .app {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-size: 26px;
+      margin: 8px 0 6px;
+      text-align: center;
+    }
+
+    .sub {
+      color: var(--muted);
+      text-align: center;
+      font-size: 14px;
+      margin-bottom: 18px;
+    }
+
+    .card {
+      background: rgba(20, 27, 52, 0.95);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 18px;
+      padding: 16px;
+      margin-bottom: 14px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    select, button {
+      width: 100%;
+      border: none;
+      border-radius: 12px;
+      padding: 13px;
+      font-size: 16px;
+    }
+
+    select {
+      background: var(--soft);
+      color: var(--text);
+      margin-bottom: 12px;
+    }
+
+    button {
+      background: linear-gradient(135deg, #38bdf8, #818cf8);
+      color: white;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 6px;
+    }
+
+    button:active {
+      transform: scale(0.99);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+    }
+
+    @media (min-width: 760px) {
+      .grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    .result-main {
+      text-align: center;
+      font-size: 22px;
+      font-weight: 800;
+      margin-bottom: 10px;
+    }
+
+    .prob {
+      font-size: 40px;
+      font-weight: 900;
+      text-align: center;
+      margin: 12px 0;
+    }
+
+    .bar {
+      height: 16px;
+      background: #0f172a;
+      border-radius: 999px;
+      overflow: hidden;
+      margin: 12px 0;
+    }
+
+    .bar-inner {
+      height: 100%;
+      width: 50%;
+      background: linear-gradient(90deg, #38bdf8, #86efac);
+      transition: width .3s ease;
+    }
+
+    .small {
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .team-box {
+      background: rgba(255,255,255,0.04);
+      border-radius: 14px;
+      padding: 12px;
+      margin-top: 10px;
+    }
+
+    .team-title {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .tag {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: rgba(125, 211, 252, .15);
+      color: var(--accent);
+      font-size: 12px;
+      margin-right: 5px;
+      margin-top: 5px;
+    }
+
+    .footer {
+      text-align: center;
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 18px;
+    }
+  </style>
+</head>
+
+<body>
+<div class="app">
+  <h1>⚽ World Cup Kickoff Predictor</h1>
+  <div class="sub">Based on your 48-team real coin toss / kickoff database</div>
+
+  <div class="card grid">
+    <div>
+      <label>Team A</label>
+      <select id="teamA"></select>
+
+      <label>Team A captain / coin-toss player</label>
+      <select id="captainA"></select>
+    </div>
+
+    <div>
+      <label>Team B</label>
+      <select id="teamB"></select>
+
+      <label>Team B captain / coin-toss player</label>
+      <select id="captainB"></select>
+    </div>
+  </div>
+
+  <div class="card">
+    <button onclick="predict()">Predict Kickoff</button>
+  </div>
+
+  <div class="card" id="result" style="display:none;">
+    <div class="result-main" id="winnerText"></div>
+    <div class="prob" id="probText"></div>
+
+    <div class="bar">
+      <div class="bar-inner" id="barInner"></div>
+    </div>
+
+    <div class="small" id="detailText"></div>
+
+    <div class="grid">
+      <div class="team-box">
+        <div class="team-title" id="boxA"></div>
+        <div class="small" id="infoA"></div>
+      </div>
+
+      <div class="team-box">
+        <div class="team-title" id="boxB"></div>
+        <div class="small" id="infoB"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    v1.0 · 48 teams completed · Captain selector included
+  </div>
+</div>
+
+<script>
+const TEAMS = {
+  "Algeria": {
+    flag: "🇩🇿", confidence: "C-B",
+    kickoffRate: 0.25, sideRate: 0.75,
+    style: "暂偏场地",
+    note: "明确样本少；7号赢后固定选场地，2号小样本开球。",
+    captains: {
+      "7": { n: 3, kickoff: 0.00, label: "7号：场地派" },
+      "2": { n: 1, kickoff: 1.00, label: "2号：小样本开球" }
+    }
+  },
+
+  "Argentina": {
+    flag: "🇦🇷", confidence: "A",
+    kickoffRate: 0.82, sideRate: 0.18,
+    style: "强开球",
+    note: "19号固定开球，10号偏开球但有场地例外。",
+    captains: {
+      "10": { n: 6, kickoff: 0.67, label: "10号：偏开球" },
+      "19": { n: 4, kickoff: 1.00, label: "19号：固定开球" },
+      "13": { n: 1, kickoff: 1.00, label: "13号：小样本开球" }
+    }
+  },
+
+  "Austria": {
+    flag: "🇦🇹", confidence: "A",
+    kickoffRate: 0.80, sideRate: 0.20,
+    style: "强开球",
+    note: "整体强开球，8号是主力但有场地样本。",
+    captains: {
+      "8": { n: 9, kickoff: 0.67, label: "8号：偏开球" },
+      "7": { n: 2, kickoff: 1.00, label: "7号：小样本开球" },
+      "9": { n: 3, kickoff: 1.00, label: "9号：小样本开球" },
+      "20": { n: 1, kickoff: 1.00, label: "20号：小样本开球" }
+    }
+  },
+
+  "Australia": {
+    flag: "🇦🇺", confidence: "A-B",
+    kickoffRate: 0.286, sideRate: 0.714,
+    style: "整体偏场地",
+    note: "1号偏场地，22号反向固定开球，必须看号码。",
+    captains: {
+      "1": { n: 4, kickoff: 0.25, label: "1号：偏场地" },
+      "22": { n: 2, kickoff: 1.00, label: "22号：固定开球" },
+      "19": { n: 1, kickoff: 0.00, label: "19号：小样本场地" }
+    }
+  },
+
+  "Belgium": {
+    flag: "🇧🇪", confidence: "A",
+    kickoffRate: 0.80, sideRate: 0.20,
+    style: "强开球",
+    note: "7号、10号、20号、21号赢后都偏开球；8号有场地例外。",
+    captains: {
+      "8": { n: 4, kickoff: 0.75, label: "8号：偏开球" },
+      "7": { n: 4, kickoff: 1.00, label: "7号：固定开球" },
+      "10": { n: 2, kickoff: 1.00, label: "10号：固定开球" },
+      "20": { n: 1, kickoff: 1.00, label: "20号：小样本开球" },
+      "21": { n: 1, kickoff: 1.00, label: "21号：小样本开球" },
+      "5": { n: 1, kickoff: 0.00, label: "5号：小样本场地" }
+    }
+  },
+
+  "Bosnia and Herzegovina": {
+    flag: "🇧🇦", confidence: "A-B",
+    kickoffRate: 0.714, sideRate: 0.286,
+    style: "偏开球",
+    note: "11号是主力，整体偏开球。",
+    captains: {
+      "11": { n: 5, kickoff: 0.60, label: "11号：偏开球" },
+      "12": { n: 1, kickoff: 1.00, label: "12号：小样本开球" },
+      "10": { n: 1, kickoff: 1.00, label: "10号：小样本开球" }
+    }
+  },
+
+  "Brazil": {
+    flag: "🇧🇷", confidence: "A",
+    kickoffRate: 0.714, sideRate: 0.286,
+    style: "强开球",
+    note: "4号、2号固定开球；5号偏开球。",
+    captains: {
+      "4": { n: 2, kickoff: 1.00, label: "4号：固定开球" },
+      "5": { n: 3, kickoff: 0.67, label: "5号：偏开球" },
+      "2": { n: 2, kickoff: 1.00, label: "2号：固定开球" }
+    }
+  },
+
+  "Cabo Verde": {
+    flag: "🇨🇻", confidence: "C",
+    kickoffRate: 0.00, sideRate: 1.00,
+    style: "小样本场地",
+    note: "仅1次明确获胜，20号选择场地。",
+    captains: {
+      "20": { n: 1, kickoff: 0.00, label: "20号：小样本场地" }
+    }
+  },
+
+  "Canada": {
+    flag: "🇨🇦", confidence: "C",
+    kickoffRate: 0.50, sideRate: 0.50,
+    style: "样本不足",
+    note: "无本方明确赢硬币样本，暂不判断偏好。",
+    captains: {
+      "7": { n: 0, kickoff: 0.50, label: "7号：暂无胜样本" },
+      "10": { n: 0, kickoff: 0.50, label: "10号：暂无胜样本" },
+      "22": { n: 0, kickoff: 0.50, label: "22号：暂无胜样本" }
+    }
+  },
+
+  "Colombia": {
+    flag: "🇨🇴", confidence: "A",
+    kickoffRate: 0.80, sideRate: 0.20,
+    style: "强开球",
+    note: "10号赢后固定开球，7号是场地特例。",
+    captains: {
+      "10": { n: 4, kickoff: 1.00, label: "10号：固定开球" },
+      "7": { n: 1, kickoff: 0.00, label: "7号：小样本场地" }
+    }
+  },
+
+  "Croatia": {
+    flag: "🇭🇷", confidence: "A",
+    kickoffRate: 0.75, sideRate: 0.25,
+    style: "偏开球",
+    note: "10号绝对主力，偏开球但不是固定。",
+    captains: {
+      "10": { n: 10, kickoff: 0.70, label: "10号：偏开球" },
+      "9": { n: 1, kickoff: 1.00, label: "9号：小样本开球" },
+      "8": { n: 1, kickoff: 1.00, label: "8号：小样本开球" }
+    }
+  },
+
+  "Curaçao": {
+    flag: "🇨🇼", confidence: "A",
+    kickoffRate: 0.00, sideRate: 1.00,
+    style: "固定场地",
+    note: "10号和1号赢后都选择场地。",
+    captains: {
+      "10": { n: 5, kickoff: 0.00, label: "10号：固定场地" },
+      "1": { n: 1, kickoff: 0.00, label: "1号：小样本场地" }
+    }
+  },
+
+  "Czechia": {
+    flag: "🇨🇿", confidence: "B-A",
+    kickoffRate: 0.667, sideRate: 0.333,
+    style: "偏开球",
+    note: "22号偏开球但不固定；7号样本少。",
+    captains: {
+      "22": { n: 10, kickoff: 0.70, label: "22号：偏开球" },
+      "7": { n: 2, kickoff: 0.50, label: "7号：摇摆" }
+    }
+  },
+
+  "DR Congo": {
+    flag: "🇨🇩", confidence: "C",
+    kickoffRate: 0.00, sideRate: 1.00,
+    style: "样本不足暂场地",
+    note: "22号固定抛硬币，但明确胜样本只有1次。",
+    captains: {
+      "22": { n: 1, kickoff: 0.00, label: "22号：小样本场地" }
+    }
+  },
+
+  "Ecuador": {
+    flag: "🇪🇨", confidence: "C",
+    kickoffRate: 0.00, sideRate: 1.00,
+    style: "样本不足暂场地",
+    note: "唯一明确获胜为22号选择场地。",
+    captains: {
+      "22": { n: 1, kickoff: 0.00, label: "22号：小样本场地" }
+    }
+  },
+
+  "Egypt": {
+    flag: "🇪🇬", confidence: "C",
+    kickoffRate: 0.50, sideRate: 0.50,
+    style: "无本方胜样本",
+    note: "埃及没有明确赢硬币样本，暂不判断偏好。",
+    captains: {
+      "10": { n: 0, kickoff: 0.50, label: "10号：暂无胜样本" },
+      "7": { n: 0, kickoff: 0.50, label: "7号：暂无胜样本" },
+      "3": { n: 0, kickoff: 0.50, label: "3号：暂无胜样本" }
+    }
+  },
+
+  "England": {
+    flag: "🏴", confidence: "B",
+    kickoffRate: 0.75, sideRate: 0.25,
+    style: "偏开球",
+    note: "整体偏开球，但9号不是固定方向。",
+    captains: {
+      "9": { n: 3, kickoff: 0.50, label: "9号：摇摆" },
+      "unknown": { n: 2, kickoff: 1.00, label: "Unknown：偏开球" }
+    }
+  },
+
+  "France": {
+    flag: "🇫🇷", confidence: "B",
+    kickoffRate: 0.60, sideRate: 0.40,
+    style: "小幅偏开球",
+    note: "10号赢后固定开球，7号/16号场地样本。",
+    captains: {
+      "10": { n: 3, kickoff: 1.00, label: "10号：固定开球" },
+      "7": { n: 1, kickoff: 0.00, label: "7号：小样本场地" },
+      "4": { n: 1, kickoff: 1.00, label: "4号：小样本开球" },
+      "16": { n: 1, kickoff: 0.00, label: "16号：小样本场地" }
+    }
+  },
+
+  "Germany": {
+    flag: "🇩🇪", confidence: "A",
+    kickoffRate: 0.857, sideRate: 0.143,
+    style: "强开球",
+    note: "6号赢后固定开球，4号是场地特例。",
+    captains: {
+      "6": { n: 6, kickoff: 1.00, label: "6号：固定开球" },
+      "4": { n: 1, kickoff: 0.00, label: "4号：小样本场地" }
+    }
+  },
+
+  "Ghana": {
+    flag: "🇬🇭", confidence: "A",
+    kickoffRate: 0.00, sideRate: 1.00,
+    style: "固定场地",
+    note: "9号赢后固定选择场地。",
+    captains: {
+      "9": { n: 4, kickoff: 0.00, label: "9号：固定场地" }
+    }
+  },
+
+  "Haiti": {
+    flag: "🇭🇹", confidence: "A-B",
+    kickoffRate: 0.286, sideRate: 0.714,
+    style: "偏场地",
+    note: "1号偏场地，4号小样本场地。",
+    captains: {
+      "1": { n: 6, kickoff: 0.333, label: "1号：偏场地" },
+      "4": { n: 1, kickoff: 0.00, label: "4号：小样本场地" }
+    }
+  },
+
+  "Iran": {
+    flag: "🇮🇷", confidence: "B",
+    kickoffRate: 0.00, sideRate: 1.00,
+    style: "固定场地",
+    note: "7号和9号赢后都选择场地。",
+    captains: {
+      "7": { n: 2, kickoff: 0.00, label: "7号：场地" },
+      "9": { n: 1, kickoff: 0.00, label: "9号：场地" }
+    }
+  },
+
+  "Iraq": {
+    flag: "🇮🇶", confidence: "A-B",
+    kickoffRate: 0.80, sideRate: 0.20,
+    style: "偏开球",
+    note: "12号是主力，明显偏开球。",
+    captains: {
+      "12": { n: 4, kickoff: 0.75, label: "12号：偏开球" },
+      "9": { n: 1, kickoff: 1.00, label: "9号：小样本开球" }
+    }
+  },
+
+  "Japan": {
+    flag: "🇯🇵", confidence: "C-B",
+    kickoffRate: 0.50, sideRate: 0.50,
+    style: "无固定偏好",
+    note: "6号开球、15号场地，样本少。",
+    captains: {
+      "6": { n: 1, kickoff: 1.00, label: "6号：小样本开球" },
+      "15": { n: 1, kickoff: 0.00, label: "15号：小样本场地" }
+    }
+  },
+
+  "Jordan": {
+    flag: "🇯🇴", confidence: "A-B",
+    kickoffRate: 0.80, sideRate: 0.20,
+    style: "强开球",
+    note: "23号赢后固定开球，13号场地特例。",
+    captains: {
+      "23": { n: 3, kickoff: 1.00, label: "23号：固定开球" },
+      "5": { n: 1, kickoff: 1.00, label: "5号：小样本开球" },
+      "13": { n: 1, kickoff: 0.00, label: "13号：小样本场地" }
+    }
+  },
+
+  "Korea Republic": {
+    flag: "🇰🇷", confidence: "B",
+    kickoffRate: 0.60, sideRate: 0.40,
+    style: "分号码判断",
+    note: "7号固定开球；6号/8号小样本场地。",
+    captains: {
+      "7": { n: 3, kickoff: 1.00, label: "7号：固定开球" },
+      "6": { n: 1, kickoff: 0.00, label: "6号：小样本场地" },
+      "8": { n: 1, kickoff: 0.00, label: "8号：小样本场地" }
+    }
+  },
+
+  "Mexico": {
+    flag: "🇲🇽", confidence: "A",
+    kickoffRate: 1.00, sideRate: 0.00,
+    style: "固定开球",
+    note: "明确赢硬币样本中100%选择开球。",
+    captains: {
+      "3": { n: 2, kickoff: 1.00, label: "3号：开球" },
+      "4": { n: 1, kickoff: 1.00, label: "4号：开球" },
+      "13": { n: 1, kickoff: 1.00, label: "13号：开球" }
+    }
+  },
+
+  "Morocco": {
+    flag: "🇲🇦", confidence: "B-A",
+    kickoffRate: 1.00, sideRate: 0.00,
+    style: "固定开球",
+    note: "2号和6号赢后都选择开球。",
+    captains: {
+      "2": { n: 2, kickoff: 1.00, label: "2号：固定开球" },
+      "6": { n: 1, kickoff: 1.00, label: "6号：小样本开球" }
+    }
+  },
+
+  "Netherlands": {
+    flag: "🇳🇱", confidence: "A",
+    kickoffRate: 0.909, sideRate: 0.091,
+    style: "强开球",
+    note: "4号赢后固定开球。",
+    captains: {
+      "4": { n: 9, kickoff: 1.00, label: "4号：固定开球" },
+      "unknown": { n: 2, kickoff: 0.50, label: "Unknown：摇摆" }
+    }
+  },
+
+  "New Zealand": {
+    flag: "🇳🇿", confidence: "C",
+    kickoffRate: 0.00, sideRate: 1.00,
+    style: "样本不足暂场地",
+    note: "唯一明确获胜为8号选择场地。",
+    captains: {
+      "8": { n: 1, kickoff: 0.00, label: "8号：小样本场地" },
+      "9": { n: 0, kickoff: 0.50, label: "9号：暂无胜样本" }
+    }
+  },
+
+  "Norway": {
+    flag: "🇳🇴", confidence: "B",
+    kickoffRate: 0.50, sideRate: 0.50,
+    style: "均衡摇摆",
+    note: "9号是主力，但不是固定方向。",
+    captains: {
+      "9": { n: 6, kickoff: 0.50, label: "9号：摇摆" },
+      "10": { n: 1, kickoff: 1.00, label: "10号：小样本开球" },
+      "8": { n: 1, kickoff: 0.00, label: "8号：小样本场地" }
+    }
+  },
+
+  "Panama": {
+    flag: "🇵🇦", confidence: "A-S",
+    kickoffRate: 1.00, sideRate: 0.00,
+    style: "固定开球",
+    note: "20号赢后固定开球。",
+    captains: {
+      "20": { n: 5, kickoff: 1.00, label: "20号：固定开球" }
+    }
+  },
+
+  "Paraguay": {
+    flag: "🇵🇾", confidence: "C",
+    kickoffRate: 0.50, sideRate: 0.50,
+    style: "无本方胜样本",
+    note: "Paraguay 没有明确本方赢硬币样本，暂不判断。",
+    captains: {
+      "15": { n: 0, kickoff: 0.50, label: "15号：暂无胜样本" },
+      "10": { n: 0, kickoff: 0.50, label: "10号：暂无胜样本" },
+      "5": { n: 0, kickoff: 0.50, label: "5号：暂无胜样本" }
+    }
+  },
+
+  "Portugal": {
+    flag: "🇵🇹", confidence: "A",
+    kickoffRate: 0.733, sideRate: 0.267,
+    style: "强开球",
+    note: "7号绝对主力，偏开球但不是固定。",
+    captains: {
+      "7": { n: 14, kickoff: 0.786, label: "7号：强开球" },
+      "8": { n: 0, kickoff: 0.50, label: "8号：暂无胜样本" },
+      "10": { n: 1, kickoff: 0.50, label: "10号：待复核" }
+    }
+  },
+
+  "Qatar": {
+    flag: "🇶🇦", confidence: "A-B",
+    kickoffRate: 0.25, sideRate: 0.75,
+    style: "偏场地",
+    note: "10号偏场地，6号小样本开球。",
+    captains: {
+      "10": { n: 3, kickoff: 0.333, label: "10号：偏场地" },
+      "16": { n: 1, kickoff: 0.00, label: "16号：小样本场地" },
+      "6": { n: 1, kickoff: 1.00, label: "6号：小样本开球" }
+    }
+  },
+
+  "Saudi Arabia": {
+    flag: "🇸🇦", confidence: "A-B",
+    kickoffRate: 0.667, sideRate: 0.333,
+    style: "偏开球",
+    note: "10号偏开球，但有场地例外。",
+    captains: {
+      "10": { n: 5, kickoff: 0.60, label: "10号：偏开球" },
+      "13": { n: 1, kickoff: 0.00, label: "13号：小样本场地" }
+    }
+  },
+
+  "Scotland": {
+    flag: "🏴󠁧󠁢󠁳󠁣󠁴󠁿", confidence: "A",
+    kickoffRate: 0.70, sideRate: 0.30,
+    style: "强开球",
+    note: "3号唯一核心，赢后70%选择开球。",
+    captains: {
+      "3": { n: 10, kickoff: 0.70, label: "3号：偏开球" }
+    }
+  },
+
+  "Senegal": {
+    flag: "🇸🇳", confidence: "B-C",
+    kickoffRate: 0.20, sideRate: 0.80,
+    style: "偏场地",
+    note: "3号和10号整体更偏场地。",
+    captains: {
+      "3": { n: 3, kickoff: 0.333, label: "3号：偏场地" },
+      "10": { n: 2, kickoff: 0.00, label: "10号：固定场地" },
+      "2": { n: 1, kickoff: 0.00, label: "2号：小样本场地" }
+    }
+  },
+
+  "South Africa": {
+    flag: "🇿🇦", confidence: "B-C",
+    kickoffRate: 0.667, sideRate: 0.333,
+    style: "轻微偏开球",
+    note: "1号是绝对主力，但选择不是固定。",
+    captains: {
+      "1": { n: 3, kickoff: 0.667, label: "1号：轻微开球" },
+      "19": { n: 0, kickoff: 0.50, label: "19号：暂无胜样本" },
+      "11": { n: 0, kickoff: 0.50, label: "11号：暂无胜样本" }
+    }
+  },
+
+  "Spain": {
+    flag: "🇪🇸", confidence: "A",
+    kickoffRate: 0.25, sideRate: 0.75,
+    style: "强场地",
+    note: "23号固定场地，7号偏场地但有开球样本。",
+    captains: {
+      "23": { n: 4, kickoff: 0.00, label: "23号：固定场地" },
+      "7": { n: 3, kickoff: 0.333, label: "7号：偏场地" },
+      "16": { n: 0, kickoff: 0.50, label: "16号：暂无胜样本" },
+      "21": { n: 0, kickoff: 0.50, label: "21号：暂无胜样本" }
+    }
+  },
+
+  "Sweden": {
+    flag: "🇸🇪", confidence: "A-B",
+    kickoffRate: 0.60, sideRate: 0.40,
+    style: "偏开球",
+    note: "3号偏开球，4号摇摆。",
+    captains: {
+      "3": { n: 3, kickoff: 0.667, label: "3号：偏开球" },
+      "4": { n: 2, kickoff: 0.50, label: "4号：摇摆" },
+      "9": { n: 0, kickoff: 0.50, label: "9号：暂无胜样本" }
+    }
+  },
+
+  "Switzerland": {
+    flag: "🇨🇭", confidence: "A",
+    kickoffRate: 1.00, sideRate: 0.00,
+    style: "固定开球",
+    note: "10号赢后100%选择开球。",
+    captains: {
+      "10": { n: 6, kickoff: 1.00, label: "10号：固定开球" },
+      "9": { n: 0, kickoff: 0.50, label: "9号：暂无胜样本" },
+      "4": { n: 0, kickoff: 0.50, label: "4号：暂无胜样本" }
+    }
+  },
+
+  "Tunisia": {
+    flag: "🇹🇳", confidence: "C",
+    kickoffRate: 0.571, sideRate: 0.429,
+    style: "仅反推开球",
+    note: "全部无画面，只能反推最终开球方，不能判断赢后偏好。",
+    captains: {
+      "13": { n: 0, kickoff: 0.50, label: "13号：无明确胜负" },
+      "17": { n: 0, kickoff: 0.50, label: "17号：无明确胜负" },
+      "2": { n: 0, kickoff: 0.50, label: "2号：无明确胜负" }
+    }
+  },
+
+  "Türkiye": {
+    flag: "🇹🇷", confidence: "A-S",
+    kickoffRate: 0.00, sideRate: 1.00,
+    style: "固定场地",
+    note: "10号赢后100%选择场地。",
+    captains: {
+      "10": { n: 9, kickoff: 0.00, label: "10号：固定场地" },
+      "22": { n: 1, kickoff: 0.00, label: "22号：小样本场地" }
+    }
+  },
+
+  "United States": {
+    flag: "🇺🇸", confidence: "C",
+    kickoffRate: 0.50, sideRate: 0.50,
+    style: "无本方胜样本",
+    note: "美国无明确本方赢硬币样本，暂不判断。",
+    captains: {
+      "13": { n: 0, kickoff: 0.50, label: "13号：暂无胜样本" },
+      "10": { n: 0, kickoff: 0.50, label: "10号：暂无胜样本" },
+      "3": { n: 0, kickoff: 0.50, label: "3号：暂无胜样本" },
+      "22": { n: 0, kickoff: 0.50, label: "22号：暂无胜样本" }
+    }
+  },
+
+  "Uruguay": {
+    flag: "🇺🇾", confidence: "A-B",
+    kickoffRate: 0.00, sideRate: 1.00,
+    style: "固定场地",
+    note: "15号和2号赢后都选择场地。",
+    captains: {
+      "15": { n: 4, kickoff: 0.00, label: "15号：固定场地" },
+      "2": { n: 1, kickoff: 0.00, label: "2号：小样本场地" }
+    }
+  },
+
+  "Uzbekistan": {
+    flag: "🇺🇿", confidence: "B",
+    kickoffRate: 0.60, sideRate: 0.40,
+    style: "分场景选择",
+    note: "14号唯一固定抛硬币球员，主场偏场地，客场偏开球。",
+    captains: {
+      "14": { n: 5, kickoff: 0.60, label: "14号：场景型" }
+    }
+  }
+};
+
+function clamp(x) {
+  return Math.max(0.02, Math.min(0.98, x));
+}
+
+function getTeamNames() {
+  return Object.keys(TEAMS).sort();
+}
+
+function fillTeams() {
+  const names = getTeamNames();
+  const teamA = document.getElementById("teamA");
+  const teamB = document.getElementById("teamB");
+
+  teamA.innerHTML = "";
+  teamB.innerHTML = "";
+
+  names.forEach(name => {
+    const optA = document.createElement("option");
+    optA.value = name;
+    optA.textContent = `${TEAMS[name].flag} ${name}`;
+    teamA.appendChild(optA);
+
+    const optB = document.createElement("option");
+    optB.value = name;
+    optB.textContent = `${TEAMS[name].flag} ${name}`;
+    teamB.appendChild(optB);
+  });
+
+  teamA.value = "Mexico";
+  teamB.value = "South Africa";
+
+  updateCaptains("A");
+  updateCaptains("B");
+}
+
+function updateCaptains(side) {
+  const teamName = document.getElementById("team" + side).value;
+  const captainSelect = document.getElementById("captain" + side);
+  const team = TEAMS[teamName];
+
+  captainSelect.innerHTML = "";
+
+  const unknown = document.createElement("option");
+  unknown.value = "unknown";
+  unknown.textContent = "Unknown captain / use team average";
+  captainSelect.appendChild(unknown);
+
+  Object.entries(team.captains || {}).forEach(([num, c]) => {
+    const opt = document.createElement("option");
+    opt.value = num;
+    opt.textContent = c.label || `${num}号`;
+    captainSelect.appendChild(opt);
+  });
+}
+
+function adjustedKickoffRate(teamName, captainNum) {
+  const team = TEAMS[teamName];
+  let base = team.kickoffRate;
+
+  if (!captainNum || captainNum === "unknown") {
+    return clamp(base);
+  }
+
+  const captain = team.captains?.[captainNum];
+  if (!captain || captain.n <= 0) {
+    return clamp(base);
+  }
+
+  const sampleWeight = Math.min(0.78, captain.n / 10);
+  const adjusted = base * (1 - sampleWeight) + captain.kickoff * sampleWeight;
+
+  return clamp(adjusted);
+}
+
+function confidenceMultiplier(teamName, captainNum) {
+  const team = TEAMS[teamName];
+  let base = 1;
+
+  if (team.confidence.includes("S")) base = 1.08;
+  else if (team.confidence.includes("A")) base = 1.04;
+  else if (team.confidence.includes("B")) base = 1.00;
+  else base = 0.94;
+
+  if (captainNum && captainNum !== "unknown") {
+    const cap = team.captains?.[captainNum];
+    if (cap && cap.n >= 3) base += 0.03;
+    if (cap && cap.n <= 1) base -= 0.02;
+  }
+
+  return base;
+}
+
+function predict() {
+  const a = document.getElementById("teamA").value;
+  const b = document.getElementById("teamB").value;
+  const ca = document.getElementById("captainA").value;
+  const cb = document.getElementById("captainB").value;
+
+  if (a === b) {
+    alert("Please choose two different teams.");
+    return;
+  }
+
+  const aKickIfWins = adjustedKickoffRate(a, ca);
+  const bKickIfWins = adjustedKickoffRate(b, cb);
+
+  // Conservative coin toss model:
+  // 50% Team A wins coin, 50% Team B wins coin.
+  // If A wins and chooses kickoff => A kicks.
+  // If B wins and chooses side => A kicks.
+  let pA = 0.5 * aKickIfWins + 0.5 * (1 - bKickIfWins);
+
+  const cmA = confidenceMultiplier(a, ca);
+  const cmB = confidenceMultiplier(b, cb);
+
+  // tiny confidence adjustment, not changing logic too much
+  const lean = (cmA - cmB) * 0.015;
+  pA = clamp(pA + lean);
+
+  const pB = 1 - pA;
+
+  const winner = pA >= pB ? a : b;
+  const winnerProb = Math.max(pA, pB);
+  const teamA = TEAMS[a];
+  const teamB = TEAMS[b];
+
+  document.getElementById("result").style.display = "block";
+  document.getElementById("winnerText").textContent =
+    `${TEAMS[winner].flag} ${winner} is more likely to kick off`;
+
+  document.getElementById("probText").textContent =
+    `${Math.round(winnerProb * 100)}%`;
+
+  document.getElementById("barInner").style.width =
+    `${Math.round(pA * 100)}%`;
+
+  document.getElementById("detailText").innerHTML = `
+    ${teamA.flag} ${a} kickoff probability: <b>${Math.round(pA * 100)}%</b><br>
+    ${teamB.flag} ${b} kickoff probability: <b>${Math.round(pB * 100)}%</b><br><br>
+    Model logic: if a team wins the toss and chooses kickoff, it kicks off.
+    If it chooses side/field, the opponent kicks off.
+  `;
+
+  document.getElementById("boxA").textContent = `${teamA.flag} ${a}`;
+  document.getElementById("boxB").textContent = `${teamB.flag} ${b}`;
+
+  document.getElementById("infoA").innerHTML = teamInfo(a, ca, aKickIfWins);
+  document.getElementById("infoB").innerHTML = teamInfo(b, cb, bKickIfWins);
+}
+
+function teamInfo(teamName, captainNum, adjustedRate) {
+  const t = TEAMS[teamName];
+  const cap = captainNum === "unknown" ? null : t.captains?.[captainNum];
+
+  return `
+    <span class="tag">Confidence: ${t.confidence}</span>
+    <span class="tag">${t.style}</span><br><br>
+    Team kickoff tendency if winning toss: <b>${Math.round(t.kickoffRate * 100)}%</b><br>
+    Adjusted with captain: <b>${Math.round(adjustedRate * 100)}%</b><br>
+    Captain: <b>${cap ? cap.label : "Unknown / team average"}</b><br><br>
+    ${t.note}
+  `;
+}
+
+document.getElementById("teamA").addEventListener("change", () => updateCaptains("A"));
+document.getElementById("teamB").addEventListener("change", () => updateCaptains("B"));
+
+fillTeams();
+predict();
+</script>
+</body>
+</html>
